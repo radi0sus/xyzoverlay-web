@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>xyzoverlay web</title>
+  <link rel="stylesheet" href="static/css/style.css" />
+</head>
+<body>
+
+  <div id="page-dropzone-overlay" class="page-dropzone-overlay">Drop XYZ file(s) here</div>
+
+  <header class="app-header">
+    <h1>xyzoverlay web</h1>
+    <div id="dropzone" class="dropzone" title="Click to browse, or drag and drop files anywhere on the page">
+      <span>Open or drop XYZ / multi-XYZ file(s) (element x y z per line)</span>
+      <input type="file" id="file-input" accept=".xyz,.txt" multiple hidden />
+    </div>
+    <div id="file-meta" class="file-meta"></div>
+    <button id="btn-paste-clipboard" class="btn-small" type="button">Get XYZ data from clipboard</button>
+  </header>
+
+  <div id="warning-banner" class="warning-banner"></div>
+
+  <div id="paste-modal" class="paste-modal">
+    <div class="paste-modal-box">
+      <h3>Paste XYZ data</h3>
+      <p class="xform-hint">Click into the field below and press <code>Ctrl+V</code> (or <code>Cmd+V</code>) to paste. It loads automatically as soon as you paste — added to whatever is already loaded, just like "+ Add file(s)".</p>
+      <textarea id="paste-textarea" class="paste-textarea" placeholder="Click here, then paste (Ctrl+V)…" spellcheck="false"></textarea>
+      <div class="paste-modal-actions">
+        <button id="paste-cancel" class="btn-small">Cancel</button>
+        <button id="paste-confirm" class="btn-small">Load</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="empty-state" class="empty-state">
+    No file loaded yet. Open or drop one or more .xyz files, or a multi-XYZ file,
+    to overlay and align molecules.
+  </div>
+
+  <main id="app-main" class="app-main">
+
+    <section class="panel viewer-panel" id="viewer-panel">
+      <div class="panel-toolbar">
+        <span class="filter-label">Global settings:</span>
+        <label class="filter-label" for="sphere-scale">Atom size</label>
+        <input type="range" id="sphere-scale" min="20" max="200" step="5" value="75" title="Scale all atom sphere sizes" />
+        <span id="sphere-scale-label" class="filter-label">75%</span>
+        <span class="toolbar-divider"></span>
+        <label class="filter-label" for="bond-radius">Bond thickness</label>
+        <input type="range" id="bond-radius" min="2" max="15" step="1" value="7" title="Scale the thickness of bond cylinders" />
+        <span id="bond-radius-label" class="filter-label">0.07</span>
+        <span class="toolbar-divider"></span>
+        <label class="filter-label" for="bond-tolerance">Bond tolerance</label>
+        <input type="range" id="bond-tolerance" min="0" max="30" step="1" value="8" title="Percent added to the sum of covalent radii when detecting bonds between atoms" />
+        <span id="bond-tolerance-label" class="filter-label">8%</span>
+      </div>
+      <div class="panel-toolbar">
+        <span class="filter-label">Selection:</span>
+        <button id="btn-invert-selection" class="btn-small" title="Invert the current atom/bond selection across all molecules">Invert selection</button>
+        <button id="btn-hide-selected" class="btn-small" title="Hide the selected atoms and bonds">Hide selected</button>
+        <button id="btn-clear-all-picks" class="btn-small" title="Clear the current atom/bond selection">Clear selection</button>
+        <button id="btn-undo-all-exclusions" class="btn-small" title="Un-exclude every atom and bond in every molecule">Unhide all</button>
+      </div>
+      <div class="panel-toolbar">
+        <span class="filter-label" title="Click an element to select/deselect all its (non-hidden) atoms">Elements:</span>
+        <div id="element-select-pills" class="element-pills"></div>
+      </div>
+      <div class="panel-toolbar">
+        <span class="filter-label" title="Click a bond type to select/deselect all bonds of that type">Bonds:</span>
+        <div id="bondtype-select-pills" class="element-pills"></div>
+      </div>
+
+      <div id="viewer-3d" class="viewer-3d">
+        <div id="viewer-legend" class="viewer-legend"></div>
+      </div>
+
+      <div class="panel-toolbar">
+        <button id="reset-view" class="btn-small" title="Zoom/pan to fit all currently visible molecules">Reset view</button>
+      </div>
+      <div class="panel-toolbar">
+        <label class="toggle-switch" for="axes-toggle" title="Show XYZ orientation axes at the origin">
+          <input type="checkbox" id="axes-toggle" />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">Show axes</span>
+        </label>
+        <label class="toggle-switch" for="legend-toggle" title="Show the element/molecule color legend">
+          <input type="checkbox" id="legend-toggle" checked />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">Show legend</span>
+        </label>
+        <label class="toggle-switch" for="bonds-toggle" title="Show or hide all bonds in the viewer">
+          <input type="checkbox" id="bonds-toggle" checked />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">Show bonds</span>
+        </label>
+      </div>
+    </section>
+
+    <div id="panel-splitter" class="panel-splitter" title="Drag to resize the viewer/panel split (double-click to reset)"></div>
+
+    <aside class="panel side-panel" id="side-panel">
+
+      <section class="subpanel">
+        <h2>Style <span class="hint-inline">(applies live to the current selection)</span></h2>
+        <p class="hint-text" id="style-selection-count">Nothing selected</p>
+        <div class="form-row">
+          <input type="checkbox" id="style-use-size" checked />
+          <label for="style-size">Size</label>
+          <input type="range" id="style-size" min="20" max="200" step="5" value="75" title="Same % scale as the global Atom size slider — 75% here looks identical to 75% there" />
+          <span id="style-size-label" class="filter-label">75%</span>
+        </div>
+        <div class="form-row">
+          <input type="checkbox" id="style-use-opacity" checked />
+          <label for="style-opacity">Opacity</label>
+          <input type="range" id="style-opacity" min="0" max="100" step="5" value="100" title="Opacity for the selected atoms/bonds" />
+          <span id="style-opacity-label" class="filter-label">100%</span>
+        </div>
+        <div class="form-row">
+          <button id="btn-clear-style-selection" class="btn-small" title="Remove style overrides from the currently selected atoms/bonds only">Clear selection style</button>
+          <button id="btn-clear-style-all" class="btn-small" title="Remove all style overrides from every molecule">Clear all styles</button>
+        </div>
+      </section>
+
+
+      <section class="subpanel">
+        <h2>Coloring <span class="hint-inline">(apply to all molecules)</span></h2>
+        <p class="hint-text">Bulk actions only — each molecule's own color-mode/color choice stays available afterwards and can still be changed individually.</p>
+        <div class="form-row">
+          <label for="palette-scheme">Palette</label>
+          <select id="palette-scheme" class="select-small" title="Choose a color scheme, then click Apply">
+            <option value="golden">Golden angle (max. distinct)</option>
+            <option value="sunset">Sunset</option>
+            <option value="blackred">Black → Red</option>
+            <option value="mono">Monochrome shades (uses color below)</option>
+            <option value="element">Element colors (CPK-style)</option>
+            <option value="same">Same color for all (uses color below)</option>
+          </select>
+          <button id="btn-apply-palette" class="btn-small" title="Apply the chosen palette across all currently loaded molecules">Apply palette</button>
+        </div>
+        <div class="form-row">
+          <input type="color" id="bulk-single-color" value="#4e9af1" title="Used by 'Monochrome shades' (as the base hue) and by 'Same color for all' (used directly)" />
+          <span class="hint-inline">used by "Monochrome shades" and "Same color for all"</span>
+        </div>
+      </section>
+
+      <section class="subpanel">
+        <h2>Molecules</h2>
+        <div id="molecule-list" class="molecule-list"></div>
+        <button id="btn-add-files" class="btn-small" title="Add more XYZ or multi-XYZ files without removing what's loaded">+ Add file(s)</button>
+      </section>
+
+      <section class="subpanel">
+        <h2>Overlay</h2>
+        <div class="form-row">
+          <label for="overlay-mode">Mode</label>
+          <select id="overlay-mode" class="select-small" title="How corresponding atoms between molecules are determined for the Kabsch fit">
+            <option value="manual">Manual atom pairs (picked per molecule)</option>
+            <option value="same">Same atom numbers in all molecules</option>
+            <option value="all">All atoms (equal atom count required)</option>
+            <option value="auto">Auto-overlay</option>
+          </select>
+        </div>
+        <div class="form-row" id="same-atoms-row" hidden>
+          <label for="same-atoms-input">Atom numbers</label>
+          <input type="text" id="same-atoms-input" placeholder="e.g. 1 2 3" title="Space- or comma-separated atom numbers, present and equivalent in every molecule" />
+        </div>
+        <div class="form-row" id="auto-iter-row" hidden>
+          <label for="auto-iterations">ICP iterations</label>
+          <input type="number" id="auto-iterations" min="1" max="20" value="6" title="Number of ICP refinement iterations for auto-overlay" />
+        </div>
+        <div class="form-row">
+          <button id="btn-center-all" class="btn-small" title="Move every molecule's centroid to the origin">Center all on centroid</button>
+        </div>
+        <div class="form-row">
+          <button id="btn-run-overlay" class="btn-small primary" title="Run the selected overlay mode using the current reference molecule">Apply overlay</button>
+        </div>
+        <div id="overlay-status" class="overlay-status"></div>
+      </section>
+
+      <section class="subpanel">
+        <h2>Export</h2>
+        <div class="form-row">
+          <button id="copy-multi-xyz" class="btn-small" title="Copy all molecules (excluded atoms omitted) as one multi-XYZ text to the clipboard">Copy multi-XYZ</button>
+        </div>
+        <div class="form-row">
+          <button id="export-multi-xyz" class="btn-small" title="Download all molecules (excluded atoms omitted) as one multi-XYZ file">Download multi-XYZ</button>
+        </div>
+        <div class="form-row">
+          <button id="export-png" class="btn-small" title="Render the current view to a white-background, 300 dpi PNG">Export PNG (white, 300 dpi)</button>
+        </div>
+      </section>
+
+    </aside>
+  </main>
+
+  <script src="static/vendor/3dmol.min.js"></script>
+  <script src="static/js/elements.js"></script>
+  <script src="static/js/align.js"></script>
+  <script src="static/js/parse.js"></script>
+  <script src="static/js/export.js"></script>
+  <script src="static/js/molecules.js"></script>
+  <script src="static/js/viewer.js"></script>
+  <script src="static/js/ui.js"></script>
+  <script src="static/js/app.js"></script>
+</body>
+</html>
