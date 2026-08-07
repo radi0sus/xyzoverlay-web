@@ -10,6 +10,21 @@ window.XO_UI = (() => {
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
+  // Picks readable text (near-black or near-white) for a solid-filled
+  // pill background, since a fixed white text color is unreadable on
+  // bright element colors (e.g. Sulfur's yellow) - standard WCAG-ish
+  // relative luminance threshold.
+  function readableTextOn(hexColor) {
+    const hex = (hexColor || "").replace("#", "");
+    if (hex.length !== 6) return "#fff";
+    const r = parseInt(hex.slice(0, 2), 16) / 255;
+    const g = parseInt(hex.slice(2, 4), 16) / 255;
+    const b = parseInt(hex.slice(4, 6), 16) / 255;
+    const lin = (c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+    const luminance = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    return luminance > 0.55 ? "#12161a" : "#fff";
+  }
+
   function showApp(hasMolecules) {
     document.getElementById("empty-state").style.display = hasMolecules ? "none" : "";
     document.getElementById("app-main").style.display = hasMolecules ? "grid" : "none";
@@ -59,7 +74,10 @@ window.XO_UI = (() => {
       const row1 = document.createElement("div");
       row1.className = "molecule-card-row1";
       row1.innerHTML = `
-        <input type="checkbox" class="mol-visible" ${mol.visible ? "checked" : ""} title="Visible" />
+        <label class="toggle-switch mol-visible-toggle" title="Toggle visibility">
+          <input type="checkbox" class="mol-visible" ${mol.visible ? "checked" : ""} />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        </label>
         <span class="molecule-card-name" title="${escapeHtml(mol.name)}">${escapeHtml(mol.name)}</span>
         <input type="radio" name="mol-ref" class="mol-ref-radio" ${mol.isReference ? "checked" : ""} title="Use as overlay reference" />
       `;
@@ -69,7 +87,7 @@ window.XO_UI = (() => {
       const row2 = document.createElement("div");
       row2.className = "molecule-card-row2";
       row2.innerHTML = `
-        <span>${active} atoms${excludedCount ? ` (${excludedCount} excluded)` : ""}${excludedBondCount ? ` · ${excludedBondCount} bond(s) hidden` : ""}</span>
+        <span>${active} atoms${excludedCount ? ` (${excludedCount} hidden)` : ""}${excludedBondCount ? ` · ${excludedBondCount} bond(s) hidden` : ""}</span>
         <span class="mol-badge${selAtomCount ? " picking" : ""}" title="${selAtomCount ? escapeHtml(selAtomList) : "No atoms selected yet"}">${selAtomCount} atom(s)${selBondCount ? `, ${selBondCount} bond(s)` : ""} selected</span>
       `;
       card.appendChild(row2);
@@ -100,7 +118,7 @@ window.XO_UI = (() => {
 
       row3.appendChild(makeTinyBtn("Center", () => callbacks.onCenter(mol.id), null, "Move this molecule's centroid to the origin"));
       if (selCount) row3.appendChild(makeTinyBtn("Clear selection", () => callbacks.onClearSelection(mol.id), null, "Clear this molecule's atom/bond selection"));
-      if (excludedCount || excludedBondCount) row3.appendChild(makeTinyBtn("Undo exclusions", () => callbacks.onClearExcluded(mol.id), null, "Un-exclude all atoms and bonds in this molecule"));
+      if (excludedCount || excludedBondCount) row3.appendChild(makeTinyBtn("Show hidden", () => callbacks.onClearExcluded(mol.id), null, "Show every hidden atom and bond in this molecule"));
       row3.appendChild(makeTinyBtn("Reset", () => callbacks.onReset(mol.id), null, "Restore the original coordinates from the loaded file"));
       const xyzBtn = makeTinyBtn("XYZ", () => { callbacks.onExportSingle(mol.id); flashBtn(xyzBtn, "Saved!"); }, null, "Download this molecule as a single XYZ file");
       row3.appendChild(xyzBtn);
@@ -134,9 +152,11 @@ window.XO_UI = (() => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "element-pill" + (stateClass ? " " + stateClass : "");
-      btn.style.setProperty("--pill-color", window.XO_ELEMENTS.getColor(element));
+      const pillColor = window.XO_ELEMENTS.getColor(element);
+      btn.style.setProperty("--pill-color", pillColor);
+      btn.style.setProperty("--pill-text-color", readableTextOn(pillColor));
       btn.title = `${element}: ${selected}/${total} selected — click to ${selected === total ? "deselect" : "select"} all`;
-      btn.innerHTML = `<span class="el-swatch" style="background:${window.XO_ELEMENTS.getColor(element)}"></span>${escapeHtml(element)}`;
+      btn.innerHTML = `<span class="el-swatch" style="background:${pillColor}"></span>${escapeHtml(element)}`;
       btn.addEventListener("click", () => onToggle(element));
       container.appendChild(btn);
     }
@@ -162,9 +182,11 @@ window.XO_UI = (() => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "element-pill" + (stateClass ? " " + stateClass : "");
-      btn.style.setProperty("--pill-color", window.XO_ELEMENTS.getColor(elA));
+      const colorA = window.XO_ELEMENTS.getColor(elA), colorB = window.XO_ELEMENTS.getColor(elB);
+      btn.style.setProperty("--pill-color", colorA);
+      btn.style.setProperty("--pill-text-color", readableTextOn(colorA));
       btn.title = `${type}: ${selected}/${total} bond(s) selected — click to ${selected === total ? "deselect" : "select"} all`;
-      btn.innerHTML = `<span class="el-swatch" style="background:${window.XO_ELEMENTS.getColor(elA)}"></span><span class="el-swatch" style="background:${window.XO_ELEMENTS.getColor(elB)}"></span>${escapeHtml(type)}`;
+      btn.innerHTML = `<span class="el-swatch" style="background:${colorA}"></span><span class="el-swatch" style="background:${colorB}"></span>${escapeHtml(type)}`;
       btn.addEventListener("click", () => onToggle(type));
       container.appendChild(btn);
     }

@@ -104,6 +104,7 @@ window.XO_VIEWER = (() => {
       showAxes = true,
       showLegend = true,
       showBonds = true,
+      showAtomLabels = false,
       sphereScale = 1.0,
       bondRadius = 0.07,
       bondTolerancePct = 8,
@@ -186,9 +187,17 @@ window.XO_VIEWER = (() => {
       // translucent halo here would sit on top of every selected atom
       // at a fixed opacity, making the Style panel's opacity slider
       // look like it does nothing for exactly the atoms you're editing.
+      // Sized relative to each atom's OWN radius (not a fixed value) -
+      // a fixed, much-larger-than-the-atom radius meant neighboring
+      // selected atoms' halos overlapped into a dense cyan wireframe
+      // mesh whenever many atoms were selected at once (e.g. "select
+      // all C"), which visibly washed out/lightened the whole area.
       for (const a of visibleAtoms) {
         if (!selAtoms.has(mol.id + "::" + a.num)) continue;
-        viewer.addSphere({ center: { x: a.x, y: a.y, z: a.z }, radius: 0.5, color: SELECT_COLOR, wireframe: true, opacity: 0.9 });
+        const ov = mol.atomStyles && mol.atomStyles.get(a.num);
+        const ownRadius = (ov && ov.radius != null) ? ov.radius
+          : byElement ? Elements.getDefaultSphereRadius(a.element) : 0.28 * sphereScale;
+        viewer.addSphere({ center: { x: a.x, y: a.y, z: a.z }, radius: ownRadius * 1.3, color: SELECT_COLOR, wireframe: true, opacity: 0.75 });
       }
 
       // bonds as shapes (per-molecule color if single-color mode).
@@ -217,6 +226,22 @@ window.XO_VIEWER = (() => {
 
         viewer.addCylinder({ start: { x: a.x, y: a.y, z: a.z }, end: mid, radius, color: colorA, opacity, fromCap: 1, toCap: 0, clickable: true, callback: bondClickCb });
         viewer.addCylinder({ start: { x: b.x, y: b.y, z: b.z }, end: mid, radius, color: colorB, opacity, fromCap: 1, toCap: 0, clickable: true, callback: bondClickCb });
+      }
+
+      // Persistent atom labels ("Show atom labels" toggle) - same text
+      // as the hover label below, just drawn for every visible atom at
+      // once instead of only on mouseover. Kept a bit smaller/lighter
+      // than the hover label since there can be many of these on screen
+      // simultaneously.
+      if (showAtomLabels) {
+        for (const a of visibleAtoms) {
+          viewer.addLabel(`#${a.num} ${a.element}`, {
+            position: { x: a.x, y: a.y, z: a.z },
+            backgroundColor: "#111111", backgroundOpacity: 0.65,
+            fontColor: "#ffffff", fontSize: 11, borderThickness: 0,
+            showBackground: true, inFront: true
+          });
+        }
       }
 
       model.setClickable({}, true, (atom) => {
@@ -358,19 +383,54 @@ window.XO_VIEWER = (() => {
     });
   }
 
+  // Appends a white strip below the (tightly-cropped) molecule image and
+  // draws the legend into that strip, sized to exactly fit it - rather
+  // than overlaying it on top of the image like the live web view does.
+  // The live view has comfortable empty space around the molecule from
+  // zoomTo()/zoom(0.8) so the corner-overlay legend rarely touches
+  // anything, but cropToContent() removes exactly that margin for the
+  // PNG, so overlaying there would frequently cover real atoms/bonds.
+  // Appending a strip avoids that without adding a big empty margin -
+  // the strip is exactly as tall as the legend needs.
   function composeLegendOnImage(dataUrl, scale) {
     const el = document.getElementById("viewer-legend");
     const hasLegend = el && el.children.length > 0 && lastOptions.showLegend !== false;
     if (!hasLegend) return Promise.resolve(dataUrl);
+    const items = [...el.querySelectorAll(".viewer-legend-item")].map((it) => ({
+      color: it.querySelector(".viewer-legend-swatch").style.background,
+      label: it.querySelector("span:last-child").textContent
+    }));
+    if (items.length === 0) return Promise.resolve(dataUrl);
+
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
+        const metrics = {
+          fontSize: 13 * scale,
+          swatchD: 12 * scale,
+          rowH: 20 * scale,
+          padH: 10 * scale,
+          padV: 8 * scale,
+          gap: 6 * scale,
+          lineWidth: scale
+        };
+        const measureCtx = document.createElement("canvas").getContext("2d");
+        measureCtx.font = `${metrics.fontSize}px sans-serif`;
+        let textW = 0;
+        for (const it of items) textW = Math.max(textW, measureCtx.measureText(it.label).width);
+        const panelW = metrics.padH * 2 + metrics.swatchD + metrics.gap + textW;
+        const panelH = metrics.padV * 2 + items.length * metrics.rowH;
+        const stripMargin = 10 * scale; // breathing room between molecule and legend strip
+
         const canvas = document.createElement("canvas");
         canvas.width = img.width;
-        canvas.height = img.height;
+        canvas.height = img.height + stripMargin + panelH;
         const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
-        drawLegendOnCanvas(ctx, canvas.width, canvas.height, scale);
+
+        drawLegendPanel(ctx, 10 * scale, img.height + stripMargin, panelW, panelH, items, metrics);
         resolve(canvas.toDataURL("image/png"));
       };
       img.onerror = () => resolve(dataUrl);
@@ -378,28 +438,15 @@ window.XO_VIEWER = (() => {
     });
   }
 
-  function drawLegendOnCanvas(ctx, canvasW, canvasH, scale) {
-    const el = document.getElementById("viewer-legend");
-    const items = [...el.querySelectorAll(".viewer-legend-item")].map((it) => ({
-      color: it.querySelector(".viewer-legend-swatch").style.background,
-      label: it.querySelector("span:last-child").textContent
-    }));
-    if (items.length === 0) return;
-
-    const fontSize = 13 * scale;
+  function drawLegendPanel(ctx, x, y, panelW, panelH, items, metrics) {
+    const { fontSize, swatchD, rowH, padH, padV, gap, lineWidth } = metrics;
     ctx.font = `${fontSize}px sans-serif`;
-    const swatchD = 12 * scale, rowH = 20 * scale, padH = 10 * scale, padV = 8 * scale, gap = 6 * scale;
-    let textW = 0;
-    for (const it of items) textW = Math.max(textW, ctx.measureText(it.label).width);
-    const panelW = padH * 2 + swatchD + gap + textW;
-    const panelH = padV * 2 + items.length * rowH;
-    const x = 10 * scale, y = canvasH - panelH - 10 * scale;
 
     ctx.fillStyle = "rgba(255,255,255,0.92)";
     ctx.strokeStyle = "#c0c0c0";
-    ctx.lineWidth = scale;
+    ctx.lineWidth = lineWidth;
     ctx.beginPath();
-    ctx.roundRect ? ctx.roundRect(x, y, panelW, panelH, 6 * scale) : ctx.rect(x, y, panelW, panelH);
+    ctx.roundRect ? ctx.roundRect(x, y, panelW, panelH, 6 * (lineWidth || 1)) : ctx.rect(x, y, panelW, panelH);
     ctx.fill(); ctx.stroke();
 
     items.forEach((it, i) => {

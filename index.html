@@ -61,7 +61,7 @@
         <button id="btn-invert-selection" class="btn-small" title="Invert the current atom/bond selection across all molecules">Invert selection</button>
         <button id="btn-hide-selected" class="btn-small" title="Hide the selected atoms and bonds">Hide selected</button>
         <button id="btn-clear-all-picks" class="btn-small" title="Clear the current atom/bond selection">Clear selection</button>
-        <button id="btn-undo-all-exclusions" class="btn-small" title="Un-exclude every atom and bond in every molecule">Unhide all</button>
+        <button id="btn-undo-all-exclusions" class="btn-small" title="Show every hidden atom and bond in every molecule">Show all</button>
       </div>
       <div class="panel-toolbar">
         <span class="filter-label" title="Click an element to select/deselect all its (non-hidden) atoms">Elements:</span>
@@ -95,6 +95,11 @@
           <span class="toggle-track"><span class="toggle-thumb"></span></span>
           <span class="toggle-text">Show bonds</span>
         </label>
+        <label class="toggle-switch" for="atom-labels-toggle" title="Permanently show each atom's number and element (same text as on hover)">
+          <input type="checkbox" id="atom-labels-toggle" />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">Show atom labels</span>
+        </label>
       </div>
     </section>
 
@@ -106,14 +111,20 @@
         <h2>Style <span class="hint-inline">(applies live to the current selection)</span></h2>
         <p class="hint-text" id="style-selection-count">Nothing selected</p>
         <div class="form-row">
-          <input type="checkbox" id="style-use-size" checked />
-          <label for="style-size">Size</label>
+          <label class="toggle-switch" for="style-use-size" title="Include size when applying to the selection">
+            <input type="checkbox" id="style-use-size" checked />
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-text">Size</span>
+          </label>
           <input type="range" id="style-size" min="20" max="200" step="5" value="75" title="Same % scale as the global Atom size slider — 75% here looks identical to 75% there" />
           <span id="style-size-label" class="filter-label">75%</span>
         </div>
         <div class="form-row">
-          <input type="checkbox" id="style-use-opacity" checked />
-          <label for="style-opacity">Opacity</label>
+          <label class="toggle-switch" for="style-use-opacity" title="Include opacity when applying to the selection">
+            <input type="checkbox" id="style-use-opacity" checked />
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-text">Opacity</span>
+          </label>
           <input type="range" id="style-opacity" min="0" max="100" step="5" value="100" title="Opacity for the selected atoms/bonds" />
           <span id="style-opacity-label" class="filter-label">100%</span>
         </div>

@@ -26,6 +26,7 @@
       showAxes: false,
       showLegend: true,
       showBonds: true,
+      showAtomLabels: false,
       sphereScale: 0.75,
       bondRadius: 0.07,
       bondTolerancePct: 8
@@ -177,8 +178,8 @@
     invertBtn.disabled = state.molecules.length === 0;
     undoBtn.disabled = !hasExclusions;
     undoBtn.title = hasExclusions
-      ? "Un-exclude every atom and bond in every molecule"
-      : "No atoms or bonds are currently excluded";
+      ? "Show every hidden atom and bond in every molecule"
+      : "Nothing is currently hidden";
   }
 
   // ---- file loading ----
@@ -229,15 +230,19 @@
   }
 
   // ---- clipboard paste ("Get XYZ data from clipboard") ----
+  let clipboardPasteCount = 0; // numbers successive pastes: clipboard_1.xyz, clipboard_2.xyz, ...
+
   function handlePastedText(text) {
     const trimmed = (text || "").trim();
     if (!trimmed) return false;
-    let blocks = Parse.parseXyzBlocks(trimmed, "clipboard.xyz");
-    if (blocks.length === 0) blocks = Parse.parseHeaderlessXyz(trimmed, "clipboard.xyz");
+    const filename = `clipboard_${clipboardPasteCount + 1}.xyz`;
+    let blocks = Parse.parseXyzBlocks(trimmed, filename);
+    if (blocks.length === 0) blocks = Parse.parseHeaderlessXyz(trimmed, filename);
     if (blocks.length === 0) {
       UI.setWarning("Pasted text: no valid XYZ format detected.");
       return false;
     }
+    clipboardPasteCount++;
     addParsedBlocks([blocks], []);
     return true;
   }
@@ -459,6 +464,10 @@
     });
     document.getElementById("bonds-toggle").addEventListener("change", (e) => {
       state.renderOptions.showBonds = e.target.checked;
+      rerenderViewer();
+    });
+    document.getElementById("atom-labels-toggle").addEventListener("change", (e) => {
+      state.renderOptions.showAtomLabels = e.target.checked;
       rerenderViewer();
     });
     document.getElementById("btn-invert-selection").addEventListener("click", () => {
@@ -744,6 +753,19 @@
     initPasteModal();
     initSplitter();
     window.addEventListener("resize", () => Viewer.resize());
+    // Plain CSS (--viewer-bg etc.) updates live with the OS theme on its
+    // own, but the WebGL canvas background and CPK atom colors are only
+    // ever read/computed at render time, not re-pushed automatically -
+    // so without this listener, "the legend follows dark mode but the
+    // molecule itself doesn't" (background baked in at Viewer.init(),
+    // atom colors baked in at whatever the last render's colorMode call
+    // produced) is exactly what happens on an OS theme flip.
+    if (window.matchMedia) {
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+        Viewer.updateBackgroundColor();
+        rerenderViewer();
+      });
+    }
     UI.showApp(false);
     rerenderElementPanel();
     rerenderBondTypePanel();
