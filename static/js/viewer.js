@@ -383,15 +383,16 @@ window.XO_VIEWER = (() => {
     });
   }
 
-  // Appends a white strip below the (tightly-cropped) molecule image and
-  // draws the legend into that strip, sized to exactly fit it - rather
-  // than overlaying it on top of the image like the live web view does.
-  // The live view has comfortable empty space around the molecule from
+  // Appends a white column to the right of the (tightly-cropped)
+  // molecule image and draws the legend into it, starting near the top
+  // - molecule on the left, legend on the right, rather than overlaying
+  // it on top of the image like the live web view does. The live view
+  // has comfortable empty space around the molecule from
   // zoomTo()/zoom(0.8) so the corner-overlay legend rarely touches
   // anything, but cropToContent() removes exactly that margin for the
   // PNG, so overlaying there would frequently cover real atoms/bonds.
-  // Appending a strip avoids that without adding a big empty margin -
-  // the strip is exactly as tall as the legend needs.
+  // Appending a column avoids that without adding a big empty margin -
+  // the column is exactly as wide as the legend needs.
   function composeLegendOnImage(dataUrl, scale) {
     const el = document.getElementById("viewer-legend");
     const hasLegend = el && el.children.length > 0 && lastOptions.showLegend !== false;
@@ -420,18 +421,21 @@ window.XO_VIEWER = (() => {
         for (const it of items) textW = Math.max(textW, measureCtx.measureText(it.label).width);
         const panelW = metrics.padH * 2 + metrics.swatchD + metrics.gap + textW;
         const panelH = metrics.padV * 2 + items.length * metrics.rowH;
-        const stripMargin = 14 * scale; // gap between molecule and legend strip
-        const edgeMargin = 14 * scale;  // gap between the legend panel and the image's own edges (left/bottom)
+        const stripMargin = 14 * scale; // gap between molecule and legend column
+        const edgeMargin = 14 * scale;  // gap between the legend panel and the image's own edges (top/right)
 
+        const canvasHeight = Math.max(img.height, panelH + edgeMargin * 2);
         const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height + stripMargin + panelH + edgeMargin;
+        canvas.width = img.width + stripMargin + panelW + edgeMargin;
+        canvas.height = canvasHeight;
         const ctx = canvas.getContext("2d");
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
+        // vertically center the molecule if the legend needed a taller canvas
+        const imgY = (canvasHeight - img.height) / 2;
+        ctx.drawImage(img, 0, imgY);
 
-        drawLegendPanel(ctx, edgeMargin, img.height + stripMargin, panelW, panelH, items, metrics);
+        drawLegendPanel(ctx, img.width + stripMargin, edgeMargin, panelW, panelH, items, metrics);
         resolve(canvas.toDataURL("image/png"));
       };
       img.onerror = () => resolve(dataUrl);

@@ -102,18 +102,24 @@ window.XO_MOLECULES = (() => {
     return hslToHex(hue, 72, 52);
   }
 
-  // scheme: 'golden' | 'sunset' | 'blackred' | 'mono'
-  // baseColorHex: only used by 'mono' (its hue/saturation are reused,
-  // lightness is varied across the gradient)
+  // scheme: 'golden' | 'sunset' | 'blackred' | 'mono' | 'mono-inv'
+  // baseColorHex: only used by 'mono'/'mono-inv' (its hue/saturation are
+  // reused, lightness is varied across the gradient)
   function generatePalette(scheme, count, baseColorHex) {
     const colors = [];
     for (let i = 0; i < count; i++) {
       const t = count > 1 ? i / (count - 1) : 0;
       if (scheme === "sunset") colors.push(interpolateGradient(GRADIENT_STOPS.sunset, t));
       else if (scheme === "blackred") colors.push(interpolateGradient(GRADIENT_STOPS.blackred, t));
-      else if (scheme === "mono") {
+      else if (scheme === "mono" || scheme === "mono-inv") {
         const { h, s } = hexToHsl(baseColorHex || "#4e9af1");
-        colors.push(hslToHex(h, Math.max(35, s), 20 + t * 58));
+        // true grays (s === 0, e.g. black/white) must stay gray - forcing
+        // a minimum saturation would tint them with whatever hue an
+        // achromatic color happens to default to (0 = red), which is
+        // exactly why black used to fade to light *red* instead of gray
+        const sat = s === 0 ? 0 : Math.max(35, s);
+        const tt = scheme === "mono-inv" ? 1 - t : t;
+        colors.push(hslToHex(h, sat, 20 + tt * 58));
       } else {
         colors.push(paletteColor(i));
       }

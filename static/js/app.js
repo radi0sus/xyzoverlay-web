@@ -96,6 +96,7 @@
         if (selectAll) for (const n of nums) mol.selectedAtoms.add(n);
         else for (const n of nums) mol.selectedAtoms.delete(n);
       }
+      syncOverlayModeToManual();
       rerenderAll();
     }, (element, hex) => {
       Elements.setCustomColor(element, hex);
@@ -353,12 +354,25 @@
     }
   };
 
+  // Selecting atoms directly (click, or an element pill) is how "Manual
+  // atom pairs" overlay picks are built, so jump the Overlay panel's
+  // mode there automatically instead of leaving the selection sitting
+  // unused under whatever mode happened to be active before.
+  function syncOverlayModeToManual() {
+    const modeSelect = document.getElementById("overlay-mode");
+    if (!modeSelect || modeSelect.value === "manual") return;
+    modeSelect.value = "manual";
+    document.getElementById("same-atoms-row").hidden = true;
+    document.getElementById("auto-iter-row").hidden = true;
+  }
+
   // ---- atom/bond-click interaction: pure toggle-selection, no modes ----
   Viewer.setAtomClickCallback((moleculeId, atomNum) => {
     const mol = state.molecules.find((m) => m.id === moleculeId);
     if (!mol) return;
     if (mol.selectedAtoms.has(atomNum)) mol.selectedAtoms.delete(atomNum);
     else mol.selectedAtoms.add(atomNum);
+    syncOverlayModeToManual();
     rerenderAll();
   });
 
@@ -741,7 +755,7 @@
     // while "Golden angle" is selected would silently switch schemes
     document.getElementById("bulk-single-color").addEventListener("input", () => {
       const scheme = document.getElementById("palette-scheme").value;
-      if (scheme === "mono" || scheme === "same") applyPalette();
+      if (scheme === "mono" || scheme === "mono-inv" || scheme === "same") applyPalette();
     });
   }
 
