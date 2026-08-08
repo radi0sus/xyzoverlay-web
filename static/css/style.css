@@ -271,29 +271,23 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accen
 }
 .selection-row-buttons { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
-.element-pills { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.element-pill {
-  display: inline-flex; align-items: center; gap: 5px;
-  border: 1px solid var(--border); border-radius: 999px;
-  background: var(--panel-soft); color: var(--text);
-  padding: 3px 10px 3px 8px; font-size: 0.78rem; font: inherit; cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
-}
-.element-pill:hover { border-color: var(--pill-color, var(--accent)); }
-.element-pill.partial {
-  background: color-mix(in srgb, var(--pill-color, var(--accent)) 20%, var(--panel-soft));
-  border-color: color-mix(in srgb, var(--pill-color, var(--accent)) 55%, var(--border));
-}
-.element-pill.active {
-  background: var(--pill-color, var(--accent));
-  border-color: var(--pill-color, var(--accent));
-  color: var(--pill-text-color, #fff);
-}
-.element-pill.active .el-swatch { border-color: rgba(255, 255, 255, 0.65); }
-
 #selection-chips { min-height: 24px; max-height: 30px; overflow-y: auto; align-content: flex-start; }
 
 .viewer-3d { flex: 1; min-height: 180px; position: relative; }
+
+.viewer-busy {
+  position: absolute; inset: 0; display: none;
+  align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.15); z-index: 50; pointer-events: none;
+}
+.viewer-busy.active { display: flex; }
+.viewer-spinner {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: var(--accent);
+  animation: viewer-spin 0.8s linear infinite;
+}
+@keyframes viewer-spin { to { transform: rotate(360deg); } }
 
 .viewer-legend {
   position: absolute; left: 10px; bottom: 10px; z-index: 5;
@@ -415,7 +409,7 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accen
 .subpanel { border-bottom: 1px solid var(--border); padding-bottom: 14px; }
 .subpanel:last-child { border-bottom: none; padding-bottom: 0; }
 
-.form-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.form-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .form-row label { font-size: 0.8rem; color: var(--muted); min-width: 110px; }
 .form-row input[type="text"], .form-row input[type="number"], .select-small {
   flex: 1; padding: 5px 8px; border-radius: 8px; font-size: 0.82rem;
@@ -465,17 +459,13 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accen
 
 .element-pills { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .element-pill {
-  display: inline-flex; align-items: center; gap: 5px;
+  display: inline-flex; align-items: center; gap: 4px;
   border: 1px solid var(--border); border-radius: 999px;
   background: var(--panel-soft); color: var(--text);
-  padding: 3px 10px 3px 8px; font-size: 0.78rem; font: inherit; cursor: pointer;
+  padding: 3px 10px 3px 6px; font-size: 0.78rem;
   transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 .element-pill:hover { border-color: var(--pill-color, var(--accent)); }
-.element-pill.hidden-el {
-  background: var(--panel); color: var(--muted); opacity: 0.55;
-  text-decoration: line-through;
-}
 .element-pill.partial {
   background: color-mix(in srgb, var(--pill-color, var(--accent)) 20%, var(--panel-soft));
   border-color: color-mix(in srgb, var(--pill-color, var(--accent)) 55%, var(--border));
@@ -485,11 +475,35 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accen
   border-color: var(--pill-color, var(--accent));
   color: var(--pill-text-color, #fff);
 }
-.element-pill.active .el-swatch { border-color: rgba(255, 255, 255, 0.65); }
-.el-swatch {
-  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
-  margin-right: 2px; border: 1px solid var(--border-strong); vertical-align: middle;
+
+/* the text/select part of an Elements-row pill - a plain reset button
+   so it can sit next to the interactive color-picker swatch below
+   without the invalid-HTML "button inside a button" problem */
+.element-pill-select {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: none; border: none; padding: 0; margin: 0;
+  color: inherit; font: inherit; font-size: 0.78rem; cursor: pointer;
 }
 
-.element-group-label { font-size: 0.78rem; font-weight: 600; color: var(--text); margin: 0 0 6px; }
+.el-swatch {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  border: 1px solid var(--border-strong); vertical-align: middle; flex-shrink: 0;
+}
+.element-pill.active .el-swatch { border-color: rgba(255, 255, 255, 0.65); }
+
+/* interactive color-picker swatch on each Elements-row pill (visually
+   replaces the plain .el-swatch dot there); clicking it opens the
+   native color picker without toggling the pill's atom selection,
+   since it's a sibling of .element-pill-select, not nested inside it */
+.element-pill-color {
+  width: 13px; height: 13px; padding: 0; margin: 0; border: none;
+  border-radius: 50%; cursor: pointer; flex-shrink: 0;
+  -webkit-appearance: none; appearance: none; background: none;
+}
+.element-pill-color::-webkit-color-swatch-wrapper { padding: 0; border-radius: 50%; }
+.element-pill-color::-webkit-color-swatch { border: 1px solid var(--border-strong); border-radius: 50%; }
+.element-pill-color::-moz-color-swatch { border: 1px solid var(--border-strong); border-radius: 50%; }
+.element-pill.active .element-pill-color::-webkit-color-swatch,
+.element-pill.active .element-pill-color::-moz-color-swatch { border-color: rgba(255, 255, 255, 0.65); }
+
 .hint-inline { font-weight: 400; color: var(--muted); font-size: 0.74rem; }

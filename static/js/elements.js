@@ -40,6 +40,9 @@ window.XO_ELEMENTS = (() => {
   };
   const elementColorsDark = { C: "#9a9a9a" };
   const elementColorsLight = { H: "#dcdcdc" };
+  // user-set overrides via the Elements pill color picker (ui.js) - take
+  // priority over everything else, including the dark/light variants above
+  const customColors = {};
 
   // base sphere radius (A), before the global sphereScale multiplier
   const baseSphereRadii = { H: 0.20, default: 0.28 };
@@ -83,10 +86,19 @@ window.XO_ELEMENTS = (() => {
   }
 
   function getColor(element) {
+    if (customColors[element]) return customColors[element];
     if (prefersDarkMode()) {
       return elementColorsDark[element] || elementColors[element] || elementColors.default;
     }
     return elementColorsLight[element] || elementColors[element] || elementColors.default;
+  }
+
+  function setCustomColor(element, hex) {
+    customColors[element] = hex;
+  }
+
+  function clearCustomColor(element) {
+    delete customColors[element];
   }
 
   function distance(a, b) {
@@ -122,7 +134,7 @@ window.XO_ELEMENTS = (() => {
   }
 
   return {
-    getCovRadius, getColor, getDefaultSphereRadius, getBaseSphereRadius, findBonds, distance,
+    getCovRadius, getColor, setCustomColor, clearCustomColor, getDefaultSphereRadius, getBaseSphereRadius, findBonds, distance,
     setSphereScale, getSphereScale
   };
 })();

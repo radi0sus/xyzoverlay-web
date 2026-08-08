@@ -138,9 +138,14 @@ window.XO_UI = (() => {
       - "active"  (all selected)   -> click deselects all
       - "partial" (some selected)  -> click selects the rest
       - neither   (none selected)  -> click selects all
+    Each pill also carries a small interactive color-picker swatch (in
+    place of the old plain .el-swatch dot) that changes that element's
+    color everywhere in the viewer via onColorChange(element, hex) -
+    a sibling of the select button, not nested inside it, so clicking
+    the swatch never also toggles the selection.
     counts: [{ element, selected, total }]
   */
-  function renderElementSelectPills(counts, onToggle) {
+  function renderElementSelectPills(counts, onToggle, onColorChange) {
     const container = document.getElementById("element-select-pills");
     container.innerHTML = "";
     if (counts.length === 0) {
@@ -149,16 +154,30 @@ window.XO_UI = (() => {
     }
     for (const { element, selected, total } of counts) {
       const stateClass = selected === total && total > 0 ? "active" : selected > 0 ? "partial" : "";
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "element-pill" + (stateClass ? " " + stateClass : "");
       const pillColor = window.XO_ELEMENTS.getColor(element);
-      btn.style.setProperty("--pill-color", pillColor);
-      btn.style.setProperty("--pill-text-color", readableTextOn(pillColor));
-      btn.title = `${element}: ${selected}/${total} selected — click to ${selected === total ? "deselect" : "select"} all`;
-      btn.innerHTML = `<span class="el-swatch" style="background:${pillColor}"></span>${escapeHtml(element)}`;
-      btn.addEventListener("click", () => onToggle(element));
-      container.appendChild(btn);
+
+      const pill = document.createElement("span");
+      pill.className = "element-pill" + (stateClass ? " " + stateClass : "");
+      pill.style.setProperty("--pill-color", pillColor);
+      pill.style.setProperty("--pill-text-color", readableTextOn(pillColor));
+
+      const colorInput = document.createElement("input");
+      colorInput.type = "color";
+      colorInput.className = "element-pill-color";
+      colorInput.value = pillColor;
+      colorInput.title = `Change ${element}'s color`;
+      colorInput.addEventListener("input", () => onColorChange(element, colorInput.value));
+
+      const selectBtn = document.createElement("button");
+      selectBtn.type = "button";
+      selectBtn.className = "element-pill-select";
+      selectBtn.title = `${element}: ${selected}/${total} selected — click to ${selected === total ? "deselect" : "select"} all`;
+      selectBtn.textContent = element;
+      selectBtn.addEventListener("click", () => onToggle(element));
+
+      pill.appendChild(colorInput);
+      pill.appendChild(selectBtn);
+      container.appendChild(pill);
     }
   }
 

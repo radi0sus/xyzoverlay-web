@@ -43,37 +43,23 @@
 
     <section class="panel viewer-panel" id="viewer-panel">
       <div class="panel-toolbar">
-        <span class="filter-label">Global settings:</span>
-        <label class="filter-label" for="sphere-scale">Atom size</label>
-        <input type="range" id="sphere-scale" min="20" max="200" step="5" value="75" title="Scale all atom sphere sizes" />
-        <span id="sphere-scale-label" class="filter-label">75%</span>
-        <span class="toolbar-divider"></span>
-        <label class="filter-label" for="bond-radius">Bond thickness</label>
-        <input type="range" id="bond-radius" min="2" max="15" step="1" value="7" title="Scale the thickness of bond cylinders" />
-        <span id="bond-radius-label" class="filter-label">0.07</span>
-        <span class="toolbar-divider"></span>
-        <label class="filter-label" for="bond-tolerance">Bond tolerance</label>
-        <input type="range" id="bond-tolerance" min="0" max="30" step="1" value="8" title="Percent added to the sum of covalent radii when detecting bonds between atoms" />
-        <span id="bond-tolerance-label" class="filter-label">8%</span>
+        <span class="filter-label" title="Click an element to select/deselect all its (non-hidden) atoms">Select Elements:</span>
+        <div id="element-select-pills" class="element-pills"></div>
       </div>
       <div class="panel-toolbar">
-        <span class="filter-label">Selection:</span>
+        <span class="filter-label" title="Click a bond type to select/deselect all bonds of that type">Select Bonds:</span>
+        <div id="bondtype-select-pills" class="element-pills"></div>
+      </div>
+      <div class="panel-toolbar">
         <button id="btn-invert-selection" class="btn-small" title="Invert the current atom/bond selection across all molecules">Invert selection</button>
         <button id="btn-hide-selected" class="btn-small" title="Hide the selected atoms and bonds">Hide selected</button>
         <button id="btn-clear-all-picks" class="btn-small" title="Clear the current atom/bond selection">Clear selection</button>
         <button id="btn-undo-all-exclusions" class="btn-small" title="Show every hidden atom and bond in every molecule">Show all</button>
       </div>
-      <div class="panel-toolbar">
-        <span class="filter-label" title="Click an element to select/deselect all its (non-hidden) atoms">Elements:</span>
-        <div id="element-select-pills" class="element-pills"></div>
-      </div>
-      <div class="panel-toolbar">
-        <span class="filter-label" title="Click a bond type to select/deselect all bonds of that type">Bonds:</span>
-        <div id="bondtype-select-pills" class="element-pills"></div>
-      </div>
 
       <div id="viewer-3d" class="viewer-3d">
         <div id="viewer-legend" class="viewer-legend"></div>
+        <div id="viewer-busy" class="viewer-busy"><div class="viewer-spinner"></div></div>
       </div>
 
       <div class="panel-toolbar">
@@ -108,7 +94,22 @@
     <aside class="panel side-panel" id="side-panel">
 
       <section class="subpanel">
-        <h2>Style <span class="hint-inline">(applies live to the current selection)</span></h2>
+        <h2>Global settings</h2>
+        <div class="form-row">
+          <label for="sphere-scale">Atom size</label>
+          <input type="range" id="sphere-scale" min="20" max="200" step="5" value="75" title="Scale all atom sphere sizes" />
+          <span id="sphere-scale-label" class="filter-label">75%</span>
+          <label for="bond-radius">Bond thickness</label>
+          <input type="range" id="bond-radius" min="2" max="15" step="1" value="7" title="Scale the thickness of bond cylinders" />
+          <span id="bond-radius-label" class="filter-label">0.07</span>
+          <label for="bond-tolerance">Bond tolerance</label>
+          <input type="range" id="bond-tolerance" min="0" max="30" step="1" value="8" title="Percent added to the sum of covalent radii when detecting bonds between atoms" />
+          <span id="bond-tolerance-label" class="filter-label">8%</span>
+        </div>
+      </section>
+
+      <section class="subpanel">
+        <h2>Individual Settings <span class="hint-inline">(applies live to the current selection)</span></h2>
         <p class="hint-text" id="style-selection-count">Nothing selected</p>
         <div class="form-row">
           <label class="toggle-switch" for="style-use-size" title="Include size when applying to the selection">
@@ -118,8 +119,6 @@
           </label>
           <input type="range" id="style-size" min="20" max="200" step="5" value="75" title="Same % scale as the global Atom size slider — 75% here looks identical to 75% there" />
           <span id="style-size-label" class="filter-label">75%</span>
-        </div>
-        <div class="form-row">
           <label class="toggle-switch" for="style-use-opacity" title="Include opacity when applying to the selection">
             <input type="checkbox" id="style-use-opacity" checked />
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -136,19 +135,18 @@
 
 
       <section class="subpanel">
-        <h2>Coloring <span class="hint-inline">(apply to all molecules)</span></h2>
+        <h2>Coloring <span class="hint-inline">(applies live to all molecules)</span></h2>
         <p class="hint-text">Bulk actions only — each molecule's own color-mode/color choice stays available afterwards and can still be changed individually.</p>
         <div class="form-row">
           <label for="palette-scheme">Palette</label>
-          <select id="palette-scheme" class="select-small" title="Choose a color scheme, then click Apply">
+          <select id="palette-scheme" class="select-small" title="Applies immediately to all currently loaded molecules">
+            <option value="element" selected>Element colors (CPK-style)</option>
             <option value="golden">Golden angle (max. distinct)</option>
             <option value="sunset">Sunset</option>
             <option value="blackred">Black → Red</option>
             <option value="mono">Monochrome shades (uses color below)</option>
-            <option value="element">Element colors (CPK-style)</option>
             <option value="same">Same color for all (uses color below)</option>
           </select>
-          <button id="btn-apply-palette" class="btn-small" title="Apply the chosen palette across all currently loaded molecules">Apply palette</button>
         </div>
         <div class="form-row">
           <input type="color" id="bulk-single-color" value="#4e9af1" title="Used by 'Monochrome shades' (as the base hue) and by 'Same color for all' (used directly)" />
@@ -159,7 +157,6 @@
       <section class="subpanel">
         <h2>Molecules</h2>
         <div id="molecule-list" class="molecule-list"></div>
-        <button id="btn-add-files" class="btn-small" title="Add more XYZ or multi-XYZ files without removing what's loaded">+ Add file(s)</button>
       </section>
 
       <section class="subpanel">
@@ -182,9 +179,7 @@
           <input type="number" id="auto-iterations" min="1" max="20" value="6" title="Number of ICP refinement iterations for auto-overlay" />
         </div>
         <div class="form-row">
-          <button id="btn-center-all" class="btn-small" title="Move every molecule's centroid to the origin">Center all on centroid</button>
-        </div>
-        <div class="form-row">
+          <button id="btn-center-all" class="btn-small" title="Move every molecule's centroid to the origin">Center all</button>
           <button id="btn-run-overlay" class="btn-small primary" title="Run the selected overlay mode using the current reference molecule">Apply overlay</button>
         </div>
         <div id="overlay-status" class="overlay-status"></div>
@@ -194,11 +189,7 @@
         <h2>Export</h2>
         <div class="form-row">
           <button id="copy-multi-xyz" class="btn-small" title="Copy all molecules (excluded atoms omitted) as one multi-XYZ text to the clipboard">Copy multi-XYZ</button>
-        </div>
-        <div class="form-row">
           <button id="export-multi-xyz" class="btn-small" title="Download all molecules (excluded atoms omitted) as one multi-XYZ file">Download multi-XYZ</button>
-        </div>
-        <div class="form-row">
           <button id="export-png" class="btn-small" title="Render the current view to a white-background, 300 dpi PNG">Export PNG (white, 300 dpi)</button>
         </div>
       </section>

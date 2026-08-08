@@ -420,17 +420,18 @@ window.XO_VIEWER = (() => {
         for (const it of items) textW = Math.max(textW, measureCtx.measureText(it.label).width);
         const panelW = metrics.padH * 2 + metrics.swatchD + metrics.gap + textW;
         const panelH = metrics.padV * 2 + items.length * metrics.rowH;
-        const stripMargin = 10 * scale; // breathing room between molecule and legend strip
+        const stripMargin = 14 * scale; // gap between molecule and legend strip
+        const edgeMargin = 14 * scale;  // gap between the legend panel and the image's own edges (left/bottom)
 
         const canvas = document.createElement("canvas");
         canvas.width = img.width;
-        canvas.height = img.height + stripMargin + panelH;
+        canvas.height = img.height + stripMargin + panelH + edgeMargin;
         const ctx = canvas.getContext("2d");
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
 
-        drawLegendPanel(ctx, 10 * scale, img.height + stripMargin, panelW, panelH, items, metrics);
+        drawLegendPanel(ctx, edgeMargin, img.height + stripMargin, panelW, panelH, items, metrics);
         resolve(canvas.toDataURL("image/png"));
       };
       img.onerror = () => resolve(dataUrl);

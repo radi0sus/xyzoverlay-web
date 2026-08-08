@@ -126,22 +126,33 @@ window.XO_MOLECULES = (() => {
 
   function cloneAtoms(atoms) { return atoms.map((a) => ({ ...a })); }
 
+  // "1100756.xyz" + block 2 -> "1100756_2.xyz" (same "_N" convention the
+  // clipboard-paste path already uses for clipboard_1.xyz/clipboard_2.xyz)
+  function numberedFilename(filename, n) {
+    const dot = filename.lastIndexOf(".");
+    const base = dot > 0 ? filename.slice(0, dot) : filename;
+    const ext = dot > 0 ? filename.slice(dot) : "";
+    return `${base}_${n}${ext}`;
+  }
+
   // Builds Molecule objects from one or more parsed files. Each file may
   // itself contain several blocks (multi-xyz/trajectory) - every block
-  // becomes its own Molecule, named "<filename> #<n>" when there is more
-  // than one block so the origin stays traceable in the UI/export names.
+  // becomes its own Molecule. When there's more than one block, both the
+  // display name AND the export filename get a "_<n>" suffix (matching
+  // the clipboard-paste convention) so exporting every block no longer
+  // collides on the same "<filename>-mod.xyz" output name.
   function fromParsedFiles(parsedFilesList, existingCount = 0) {
     const molecules = [];
     let colorCursor = existingCount;
     for (const blocks of parsedFilesList) {
       for (const block of blocks) {
         const label = block.isMultiBlock
-          ? `${block.filename} #${block.blockIndex}`
+          ? numberedFilename(block.filename, block.blockIndex)
           : block.filename;
         molecules.push({
           id: freshId(),
           name: label,
-          filename: block.filename,
+          filename: label,
           header: block.header,
           atoms: cloneAtoms(block.atoms),
           originalAtoms: cloneAtoms(block.originalAtoms),

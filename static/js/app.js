@@ -97,6 +97,11 @@
         else for (const n of nums) mol.selectedAtoms.delete(n);
       }
       rerenderAll();
+    }, (element, hex) => {
+      Elements.setCustomColor(element, hex);
+      // element colors feed the viewer (byElement-colored atoms/bonds),
+      // the legend, and the bond-type pills below - all need a refresh
+      rerenderAll();
     });
   }
 
@@ -108,6 +113,22 @@
     updateGlobalActionButtons();
     updateStylePanelState();
     UI.showApp(state.molecules.length > 0);
+  }
+
+  // Shows a small spinner over the viewer for operations that can take
+  // noticeably long with many atoms/molecules (e.g. building a label for
+  // every atom, scanning every bond for Invert selection). JS is single-
+  // threaded, so without the setTimeout the spinner would never actually
+  // get painted before the heavy synchronous work blocks the main thread
+  // - the timeout hands control back to the browser just long enough for
+  // one paint, then runs the work and hides the spinner again.
+  function withBusyIndicator(work) {
+    const el = document.getElementById("viewer-busy");
+    el.classList.add("active");
+    setTimeout(() => {
+      try { work(); }
+      finally { el.classList.remove("active"); }
+    }, 20);
   }
 
   // Third row: bond-type pills ("C-C", "C-H", "C-N", ...), one per
@@ -263,6 +284,10 @@
       if (handlePastedText(textarea.value)) closeModal();
     }
 
+    // header button (always visible, incl. before any molecule is
+    // loaded) is the only trigger point - "+ Add file(s)" and a second
+    // paste button in the Molecules panel were redundant with the
+    // header dropzone/paste button and got removed again.
     document.getElementById("btn-paste-clipboard").addEventListener("click", openModal);
     document.getElementById("paste-cancel").addEventListener("click", closeModal);
     document.getElementById("paste-confirm").addEventListener("click", tryLoad);
@@ -468,31 +493,35 @@
     });
     document.getElementById("atom-labels-toggle").addEventListener("change", (e) => {
       state.renderOptions.showAtomLabels = e.target.checked;
-      rerenderViewer();
+      withBusyIndicator(() => rerenderViewer());
     });
     document.getElementById("btn-invert-selection").addEventListener("click", () => {
-      for (const mol of state.molecules) {
-        const activeNums = Molecules.activeAtoms(mol).map((a) => a.num);
-        const newAtoms = new Set(activeNums.filter((n) => !mol.selectedAtoms.has(n)));
-        mol.selectedAtoms = newAtoms;
+      withBusyIndicator(() => {
+        for (const mol of state.molecules) {
+          const activeNums = Molecules.activeAtoms(mol).map((a) => a.num);
+          const newAtoms = new Set(activeNums.filter((n) => !mol.selectedAtoms.has(n)));
+          mol.selectedAtoms = newAtoms;
 
-        const visibleKeys = Molecules.visibleBondKeys(mol, state.renderOptions.bondTolerancePct);
-        const newBonds = new Set(visibleKeys.filter((k) => !mol.selectedBonds.has(k)));
-        mol.selectedBonds = newBonds;
-      }
-      rerenderAll();
+          const visibleKeys = Molecules.visibleBondKeys(mol, state.renderOptions.bondTolerancePct);
+          const newBonds = new Set(visibleKeys.filter((k) => !mol.selectedBonds.has(k)));
+          mol.selectedBonds = newBonds;
+        }
+        rerenderAll();
+      });
     });
     document.getElementById("btn-hide-selected").addEventListener("click", () => {
-      for (const mol of state.molecules) {
-        for (const num of mol.selectedAtoms) {
-          const atom = mol.atoms.find((a) => a.num === num);
-          if (atom) atom.excluded = true;
+      withBusyIndicator(() => {
+        for (const mol of state.molecules) {
+          for (const num of mol.selectedAtoms) {
+            const atom = mol.atoms.find((a) => a.num === num);
+            if (atom) atom.excluded = true;
+          }
+          for (const key of mol.selectedBonds) mol.excludedBonds.add(key);
+          mol.selectedAtoms.clear();
+          mol.selectedBonds.clear();
         }
-        for (const key of mol.selectedBonds) mol.excludedBonds.add(key);
-        mol.selectedAtoms.clear();
-        mol.selectedBonds.clear();
-      }
-      rerenderAll();
+        rerenderAll();
+      });
     });
     document.getElementById("btn-clear-all-picks").addEventListener("click", () => {
       for (const m of state.molecules) { m.selectedAtoms.clear(); m.selectedBonds.clear(); }
@@ -513,7 +542,7 @@
       sameRow.hidden = modeSelect.value !== "same";
       autoRow.hidden = modeSelect.value !== "auto";
     });
-    document.getElementById("btn-run-overlay").addEventListener("click", runOverlay);
+    document.getElementById("btn-run-overlay").addEventListener("click", () => withBusyIndicator(runOverlay));
     document.getElementById("btn-center-all").addEventListener("click", () => {
       Molecules.centerAllOnCentroid(state.molecules);
       rerenderAll(false);
@@ -679,28 +708,40 @@
   }
 
   function initColoringPanel() {
-    // Apply a color scheme to every currently loaded molecule at once.
-    // Every other per-molecule setting (visibility, exclusions, overlay
-    // picks, name, reference flag, ...) is left completely untouched -
-    // only colorMode/singleColor are (re)set here.
-    document.getElementById("btn-apply-palette").addEventListener("click", () => {
+    // Applies immediately - no separate "Apply" button. Bulk action
+    // across every currently loaded molecule at once; every other
+    // per-molecule setting (visibility, exclusions, overlay picks, name,
+    // reference flag, ...) is left completely untouched, only
+    // colorMode/singleColor are (re)set here.
+    function applyPalette() {
       const scheme = document.getElementById("palette-scheme").value;
       const n = state.molecules.length;
       if (n === 0) return;
-      if (scheme === "element") {
-        for (const m of state.molecules) m.colorMode = "byElement";
-      } else if (scheme === "same") {
-        const color = document.getElementById("bulk-single-color").value;
-        for (const m of state.molecules) { m.colorMode = "single"; m.singleColor = color; }
-      } else if (scheme === "golden") {
-        // restores each molecule's own original load-order palette color
-        for (const m of state.molecules) { m.colorMode = "single"; m.singleColor = m.paletteColor; }
-      } else {
-        const baseColor = document.getElementById("bulk-single-color").value;
-        const colors = Molecules.generatePalette(scheme, n, baseColor);
-        state.molecules.forEach((m, i) => { m.colorMode = "single"; m.singleColor = colors[i]; });
-      }
-      rerenderAll();
+      withBusyIndicator(() => {
+        if (scheme === "element") {
+          for (const m of state.molecules) m.colorMode = "byElement";
+        } else if (scheme === "same") {
+          const color = document.getElementById("bulk-single-color").value;
+          for (const m of state.molecules) { m.colorMode = "single"; m.singleColor = color; }
+        } else if (scheme === "golden") {
+          // restores each molecule's own original load-order palette color
+          for (const m of state.molecules) { m.colorMode = "single"; m.singleColor = m.paletteColor; }
+        } else {
+          const baseColor = document.getElementById("bulk-single-color").value;
+          const colors = Molecules.generatePalette(scheme, n, baseColor);
+          state.molecules.forEach((m, i) => { m.colorMode = "single"; m.singleColor = colors[i]; });
+        }
+        rerenderAll();
+      });
+    }
+
+    document.getElementById("palette-scheme").addEventListener("change", applyPalette);
+    // also re-applies live when the shared color changes, but only for
+    // the two schemes that actually use it - otherwise picking a color
+    // while "Golden angle" is selected would silently switch schemes
+    document.getElementById("bulk-single-color").addEventListener("input", () => {
+      const scheme = document.getElementById("palette-scheme").value;
+      if (scheme === "mono" || scheme === "same") applyPalette();
     });
   }
 
@@ -711,7 +752,6 @@
 
     dropzone.addEventListener("click", () => input.click());
     input.addEventListener("change", () => { handleFiles(input.files); input.value = ""; });
-    document.getElementById("btn-add-files").addEventListener("click", () => input.click());
 
     let dragCounter = 0;
     // NOTE: preventDefault() is required on dragenter/dragover (not just
